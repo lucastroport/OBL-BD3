@@ -9,12 +9,32 @@ try:
 except ImportError:
     pass
 
-from dbfread import DBF
+from dbfread import DBF, FieldParser
+import datetime
+import re
 
 DB_HOST = 'localhost'
 DB_USER = 'root'
 DB_PASS = 'rootDbPassword'
 DB_NAME = 'obligatorio'
+
+# Este implementacion es necesaria para las fechas que estan en un formato incorrecto
+
+
+class AsteriskFieldParser(FieldParser):
+    def parseD(self, field, data):
+        """Parse date field and return datetime.date or None"""
+        try:
+            return datetime.date(int(data[:4]), int(data[4:6]), int(data[6:8]))
+        except ValueError:
+            print(data)
+            withoutAstersik = re.sub(rb'\*+$', b'', data)
+            if withoutAstersik.strip(b' 0') == b'':
+                # A record containing only spaces and/or zeros is
+                # a NULL value.
+                return None
+            else:
+                raise ValueError('invalid date {!r}'.format(data))
 
 
 def run_query(query=''):
@@ -43,19 +63,19 @@ def sql_create_table(db):
     columns.append("id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY")
 
     for field in fields:
-        tipo = field.type
-        if tipo == "C":
+        fieldType = field.type
+        if fieldType == "C":
             tmp = "%s VARCHAR(%s)" % (field.name, field.length + 1)
             columns.append(tmp)
-        elif tipo == "N":
+        elif fieldType == "N":
             tmp = "%s NUMERIC(%s, %s)" % (
                 field.name, field.length, field.decimal_count)
             columns.append(tmp)
-        elif tipo == "D":
+        elif fieldType == "D":
             tmp = "%s DATE" % (field.name)
             columns.append(tmp)
         else:
-            raise NotImplementedError('Type %s not implemented' % tipo)
+            raise NotImplementedError('Type %s not implemented' % fieldType)
 
     q = "CREATE TABLE IF NOT EXISTS %(names)s\n(\n%(columns)s\n);"
     q = q % dict(names=db.name.rstrip(".dbf"), columns=",\n".join(columns))
@@ -71,8 +91,8 @@ def sql_insert_into(db):
     names = apost + db.name.rstrip(".dbf") + apost
     columns = []
     params = []
-    for campo in fields:
-        columns.append(apost + campo.name + apost)
+    for field in fields:
+        columns.append(apost + field.name + apost)
         params.append("%s")
     q = "INSERT INTO %s (%s) VALUES(%s);" % (
         names, ",\n".join(columns), ",\n".join(params))
@@ -80,7 +100,7 @@ def sql_insert_into(db):
 
 
 # Conexion con el dbf.
-db = DBF('Hogares.dbf', encoding='latin-1')
+db = DBF('Personas.dbf', encoding='latin-1', parserclass=AsteriskFieldParser)
 # Estructura de la tabla
 sql = sql_create_table(db)
 
@@ -99,7 +119,7 @@ sql = sql_insert_into(db)  # Estructura del INSERT INTO.
 # data.
 for record in db:
     args = tuple(record.values())
-    print(record.items())
+    print(record)
     cursor.execute(sql, args)
 
 
