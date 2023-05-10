@@ -116,11 +116,12 @@ cursor = conn.cursor()  # Creamos un cursor para insertar los data.
 
 sql = sql_insert_into(db)  # Estructura del INSERT INTO.
 
-# data.
 for record in db:
-    args = tuple(record.values())
-    print(record)
-    cursor.execute(sql, args)
+    dpto = int(record['DPTO'])
+    if dpto in [3,7,10,11]:
+        args = tuple(record.values())
+        print(record)
+        cursor.execute(sql, args)
 
 
 conn.commit()
